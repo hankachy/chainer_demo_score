@@ -8,8 +8,6 @@ import chainer.functions  as F
 import struct
 
 # normalizeモジュールを使用する
-import sys
-sys.path.append("/home/saitoy/Linux/Repo/Demo/normalize")
 import normalize as norm
 
 
