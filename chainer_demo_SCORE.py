@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Chainer example: train a multi-layer perceptron on MNIST
 
-This is a minimal example to write a feed-forward net. It requires scikit-learn
-to load MNIST dataset.
-
-"""
 import argparse
 import numpy as np
 from chainer import cuda, Variable, FunctionSet, optimizers
@@ -26,7 +21,7 @@ args = parser.parse_args()
 # 各種パラメータ
 batchsize = 10
 n_epoch   = 10
-h_units   = 500
+h_units   = 100
 in_units  = 1
 out_units = 1
 floatsize = 4
@@ -90,6 +85,10 @@ while 1:
             break        
         # 文字列からフロート型に変換する(出力はタプル)
         tmp = struct.unpack("f", b)
+        # 1～5を0～1に正規化
+        #work = norm.normalize(tmp[0], 5, 1)
+
+        #tmplist.append(work)
         tmplist.append(tmp[0])
     if b == "":
         break
@@ -141,10 +140,8 @@ def train_forward(x_data, y_data):
     x, t = Variable(x_data), Variable(y_data)
     # 第三引数がFalse場合は第一引数の値をそのまま返す(trainの場合のみDropoutを行い、testの場合は行わないようにする)
     # hは前の層からの出力
-    h1 = F.tanh(model.l1(x))
-    h2 = F.tanh(model.l2(h1))
-    #h1 = F.dropout(F.tanh(model.l1(x)))
-    #h2 = F.dropout(F.tanh(model.l2(h1)))
+    h1 = F.dropout(F.relu(model.l1(x)))
+    h2 = F.dropout(F.relu(model.l2(h1)))
     y  = model.l3(h2)
 
     # 2乗平均誤差(MSE)を返す
@@ -155,15 +152,15 @@ def test_forward(x_data):
     x = Variable(x_data)
     # 第三引数がFalse場合は第一引数の値をそのまま返す(trainの場合のみDropoutを行い、testの場合は行わないようにする)
     # hは前の層からの出力
-    h1 = F.tanh(model.l1(x))
-    h2 = F.tanh(model.l2(h1))
+    h1 = F.relu(model.l1(x))
+    h2 = F.relu(model.l2(h1))
     y  = model.l3(h2)
 
     # 出力データを返す
     return y
 
 # Setup optimizer(BPの際に勾配を計算するアルゴリズム)
-optimizer = optimizers.Adam()
+optimizer = optimizers.SGD()
 optimizer.setup(model.collect_parameters())
 
 
