@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""Chainer example: train a multi-layer perceptron on MNIST
 
+This is a minimal example to write a feed-forward net. It requires scikit-learn
+to load MNIST dataset.
+
+"""
 import argparse
 import numpy as np
 from chainer import cuda, Variable, FunctionSet, optimizers
@@ -8,8 +13,11 @@ import chainer.functions  as F
 import struct
 
 # normalizeモジュールを使用する
+import sys
+sys.path.append("/home/saitoy/Linux/Repo/Demo/normalize")
 import normalize as norm
 
+FLAG = 0
 
 parser = argparse.ArgumentParser(description='Chainer example: MNIST')
 parser.add_argument('--gpu', '-g', default=-1, type=int,
@@ -17,9 +25,9 @@ parser.add_argument('--gpu', '-g', default=-1, type=int,
 args = parser.parse_args()
 
 # 各種パラメータ
-batchsize = 10
-n_epoch   = 10
-h_units   = 100
+batchsize = 1000
+n_epoch   = 1000
+h_units   = 10
 in_units  = 1
 out_units = 1
 floatsize = 4
@@ -30,8 +38,12 @@ N_train = 100000
 N_test = 10000
 
 # 正規化用(入力系列の最大値・最小値の設定)
-maxi = 500
-mini = 0
+maxi_in = 500
+mini_in = 0
+
+# 正規化用(出力系列の最大値・最小値の設定)
+maxi_out = 5
+mini_out= 1
 
 
 # ファイル名
@@ -61,7 +73,7 @@ while 1:
         # 文字列からフロート型に変換する(出力はタプル)
         tmp = struct.unpack("f", b)
         # 正規化
-        work = norm.normalize(tmp[0], maxi, mini)
+        work = norm.normalize(tmp[0], maxi_in, mini_in)
         
         tmplist.append(work)
     if b == "":
@@ -84,10 +96,10 @@ while 1:
         # 文字列からフロート型に変換する(出力はタプル)
         tmp = struct.unpack("f", b)
         # 1～5を0～1に正規化
-        #work = norm.normalize(tmp[0], 5, 1)
+        work = norm.normalize(tmp[0], maxi_out, mini_out)
 
-        #tmplist.append(work)
-        tmplist.append(tmp[0])
+        tmplist.append(work)
+        # tmplist.append(tmp[0])
     if b == "":
         break
     else:
@@ -111,7 +123,7 @@ while 1:
         tmp = struct.unpack("f", b)
 
         # 正規化
-        work = norm.normalize(tmp[0], maxi, mini)
+        work = norm.normalize(tmp[0], maxi_in, mini_in)
         tmplist.append(work)
     if b == "":
         break
@@ -138,8 +150,8 @@ def train_forward(x_data, y_data):
     x, t = Variable(x_data), Variable(y_data)
     # 第三引数がFalse場合は第一引数の値をそのまま返す(trainの場合のみDropoutを行い、testの場合は行わないようにする)
     # hは前の層からの出力
-    h1 = F.dropout(F.relu(model.l1(x)))
-    h2 = F.dropout(F.relu(model.l2(h1)))
+    h1 = F.dropout(F.tanh(model.l1(x)))
+    h2 = F.dropout(F.tanh(model.l2(h1)))
     y  = model.l3(h2)
 
     # 2乗平均誤差(MSE)を返す
@@ -150,15 +162,15 @@ def test_forward(x_data):
     x = Variable(x_data)
     # 第三引数がFalse場合は第一引数の値をそのまま返す(trainの場合のみDropoutを行い、testの場合は行わないようにする)
     # hは前の層からの出力
-    h1 = F.relu(model.l1(x))
-    h2 = F.relu(model.l2(h1))
+    h1 = F.tanh(model.l1(x))
+    h2 = F.tanh(model.l2(h1))
     y  = model.l3(h2)
 
     # 出力データを返す
     return y
 
 # Setup optimizer(BPの際に勾配を計算するアルゴリズム)
-optimizer = optimizers.SGD()
+optimizer = optimizers.SGD(lr=0.01)
 optimizer.setup(model.collect_parameters())
 
 
@@ -189,7 +201,7 @@ for epoch in xrange(1, n_epoch+1):
         loss = train_forward(x_batch, y_batch)
         # 逆誤差伝搬
         loss.backward()
-        # 勾配を更新
+        # 勾配によってパラメータを更新
         optimizer.update()
         # もしGPUを使っていたら、ArrayをCPU対応のものに変換する
         sum_loss     += float(cuda.to_cpu(loss.data)) * batchsize
@@ -200,7 +212,26 @@ for epoch in xrange(1, n_epoch+1):
     # Evaluation
     # 出力結果の格納
     out = test_forward(x_test).data
-      
+
+
+    # lossが小さくなってきたら学習率の変更  
+    if FLAG == 0:
+        if sum_loss / N_train < 0.05:
+            print "loss fell below 0.05. chande lr."
+            optimizer = optimizers.SGD(lr=0.005)
+            optimizer.setup(model.collect_parameters())
+            FLAG = 1
+
+    # lossが十分小さくなったらloopを抜ける
+    elif FLAG == 1:
+        if sum_loss / N_train < 0.005:
+            print "loss fell below 0.005. exit from a loop."
+            FLAG = 2
+            break
+
+
+
+
 
 print "\n\n-----------------result-----------------------\n"
 
@@ -211,7 +242,7 @@ print "MSE in training step\n",train_losstext, "\n\n"
 f_result = open(result_fname, "w")
 for i in range(N_test):
     # リストから取り出すために[0]をつける
-    f_result.write(str(out[i][0]) + "\n")
+    f_result.write(str(norm.inv_normalize(out[i][0], maxi_out, mini_out)) + "\n")
     # print str(out[i][0]) + ","
 
 
