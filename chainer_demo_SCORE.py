@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Chainer example: train a multi-layer perceptron on MNIST
 
-This is a minimal example to write a feed-forward net. It requires scikit-learn
-to load MNIST dataset.
-
-"""
 import argparse
 import numpy as np
 from chainer import cuda, Variable, FunctionSet, optimizers
